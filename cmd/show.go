@@ -42,19 +42,16 @@ func show(cmd *cobra.Command, args []string) {
 
 	slog.Debug("cmdShow origin", "Args", args)
 	args = util.FormatTag(args)
-	slog.Debug("cmdShow formatted", "Args", args)
-	// stat := trySearch(input)
-	// slog.Debug("cmdShow check the filePath", "stat", stat)
 
 	fileType, files := findFilePath(args)
-	slog.Debug("", "fileType", fileType)
+	slog.Debug("", "fileType", fileType, "files", files)
 	switch fileType {
 	case FOLDER:
 		showNoteFolder(files[0])
 	case FILE, TAG_FILE, TAG_FILES:
 		showNoteFile(files, DELIM)
 	default:
-		util.ExitMessage(fmt.Sprintf("无法定位文件 %s ", strings.Join(args, " ")))
+		util.ExitMessage(fmt.Sprintf("未发现相关文件, %s ", strings.Join(args, " ")))
 	}
 }
 
@@ -156,15 +153,22 @@ func findFilePath(args []string) (fileType FileType, files []string) {
 	// 全局精准匹配
 	if hCodes, ok := indexMap.TagMap[tag]; ok {
 		fileType = TAG_FILES
-		slog.Debug("精准匹配Tag")
+		slog.Debug("精准匹配到Tag", "tag", tag)
 		for _, hcode := range hCodes {
+			file := indexMap.HashCodeMap[hcode]
 			if addToFiles(prefixPath, hcode, indexMap.HashCodeMap, exists) {
-				files = append(files, indexMap.HashCodeMap[hcode])
+				files = append(files, file)
 			}
 		}
-		if len(files) == 1 {
+		switch len(files) {
+		case 0:
+			fileType = NOTHING
+		case 1:
 			fileType = TAG_FILE
+		default:
+			fileType = TAG_FILES
 		}
+		slog.Debug("精准匹配Tag", "target", tag, "totalFilepaths", files)
 		return
 	}
 	slog.Debug("未能精准匹配目标Tag, 进行模糊匹配", "target tag", tag)
@@ -179,7 +183,6 @@ func findFilePath(args []string) (fileType FileType, files []string) {
 				}
 			}
 		}
-
 	}
 	slog.Debug("模糊匹配Tag", "target", tag, "totalFilepaths", files)
 	switch len(files) {
